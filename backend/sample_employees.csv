@@ -1,0 +1,31 @@
+employee_id,email,first_name,last_name,phone,department,position,hire_date,birth_date
+EMP001,arjun.sharma@company.com,Arjun,Sharma,+91-9876543210,Engineering,Senior Software Developer,2022-01-15,1990-03-12
+EMP002,priya.patel@company.com,Priya,Patel,+91-9876543211,Marketing,Marketing Manager,2021-06-20,1988-07-25
+EMP003,rahul.gupta@company.com,Rahul,Gupta,+91-9876543212,Finance,Financial Analyst,2023-02-10,1992-11-08
+EMP004,sneha.reddy@company.com,Sneha,Reddy,+91-9876543213,HR,HR Specialist,2020-09-05,1989-05-18
+EMP005,vikram.singh@company.com,Vikram,Singh,+91-9876543214,Engineering,DevOps Engineer,2022-08-12,1991-12-03
+EMP006,kavya.nair@company.com,Kavya,Nair,+91-9876543215,Design,UI/UX Designer,2021-11-30,1993-02-14
+EMP007,aditya.kumar@company.com,Aditya,Kumar,+91-9876543216,Sales,Sales Executive,2023-04-18,1990-09-22
+EMP008,meera.joshi@company.com,Meera,Joshi,+91-9876543217,Engineering,Frontend Developer,2022-03-25,1994-06-07
+EMP009,rohan.mehta@company.com,Rohan,Mehta,+91-9876543218,Operations,Operations Manager,2020-12-08,1987-10-15
+EMP010,ananya.iyer@company.com,Ananya,Iyer,+91-9876543219,Marketing,Content Strategist,2021-07-14,1992-01-28
+EMP011,karthik.rao@company.com,Karthik,Rao,+91-9876543220,Engineering,Backend Developer,2022-05-22,1991-08-11
+EMP012,divya.agarwal@company.com,Divya,Agarwal,+91-9876543221,Finance,Accountant,2023-01-09,1993-04-30
+EMP013,aryan.verma@company.com,Aryan,Verma,+91-9876543222,Engineering,Full Stack Developer,2021-10-16,1990-12-19
+EMP014,pooja.bansal@company.com,Pooja,Bansal,+91-9876543223,HR,Recruiter,2022-09-03,1989-03-05
+EMP015,siddharth.malhotra@company.com,Siddharth,Malhotra,+91-9876543224,Sales,Business Development,2020-08-27,1988-11-12
+EMP016,riya.kapoor@company.com,Riya,Kapoor,+91-9876543225,Design,Graphic Designer,2023-03-14,1994-07-20
+EMP017,harsh.pandey@company.com,Harsh,Pandey,+91-9876543226,Engineering,Data Scientist,2021-12-01,1991-05-16
+EMP018,ishita.saxena@company.com,Ishita,Saxena,+91-9876543227,Marketing,Digital Marketing Specialist,2022-06-18,1992-09-08
+EMP019,nikhil.tiwari@company.com,Nikhil,Tiwari,+91-9876543228,Operations,Project Manager,2020-11-11,1987-02-23
+EMP020,shreya.mishra@company.com,Shreya,Mishra,+91-9876543229,Finance,Senior Analyst,2021-04-07,1990-08-14
+EMP021,varun.chopra@company.com,Varun,Chopra,+91-9876543230,Engineering,Mobile Developer,2022-12-20,1993-01-09
+EMP022,tanvi.bhatt@company.com,Tanvi,Bhatt,+91-9876543231,HR,HR Manager,2020-05-15,1986-06-27
+EMP023,akash.sinha@company.com,Akash,Sinha,+91-9876543232,Sales,Regional Sales Manager,2021-08-29,1989-10-04
+EMP024,nisha.goyal@company.com,Nisha,Goyal,+91-9876543233,Design,Product Designer,2023-02-28,1994-12-11
+EMP025,gaurav.jain@company.com,Gaurav,Jain,+91-9876543234,Engineering,Tech Lead,2020-07-13,1988-04-17
+EMP026,aditi.shah@company.com,Aditi,Shah,+91-9876543235,Marketing,Brand Manager,2022-10-05,1991-11-25
+EMP027,rohit.bhatia@company.com,Rohit,Bhatia,+91-9876543236,Operations,Supply Chain Manager,2021-01-22,1990-07-02
+EMP028,swati.kulkarni@company.com,Swati,Kulkarni,+91-9876543237,Finance,Finance Manager,2020-03-18,1987-09-13
+EMP029,manish.agrawal@company.com,Manish,Agrawal,+91-9876543238,Engineering,Cloud Architect,2022-11-08,1989-01-21
+EMP030,deepika.rajput@company.com,Deepika,Rajput,+91-9876543239,HR,Learning & Development,2021-05-12,1992-05-06

@@ -1,0 +1,21 @@
+holiday_name,holiday_date,holiday_type,description,is_optional
+New Year's Day,2025-01-01,public,"New Year's Day celebration",false
+Republic Day,2025-01-26,public,"India's Republic Day",false
+Holi,2025-03-14,public,"Festival of Colors",false
+Good Friday,2025-04-18,public,"Christian holiday commemorating crucifixion of Jesus",false
+Eid ul-Fitr,2025-03-31,public,"Islamic festival marking end of Ramadan",false
+Independence Day,2025-08-15,public,"India's Independence Day",false
+Janmashtami,2025-08-16,optional,"Birth of Lord Krishna",true
+Ganesh Chaturthi,2025-08-29,optional,"Festival celebrating Lord Ganesha",true
+Gandhi Jayanti,2025-10-02,public,"Mahatma Gandhi's Birthday",false
+Dussehra,2025-10-02,public,"Victory of good over evil",false
+Karva Chauth,2025-10-20,optional,"Hindu festival observed by married women",true
+Diwali,2025-10-20,public,"Festival of Lights",false
+Bhai Dooj,2025-10-22,optional,"Festival celebrating brother-sister bond",true
+Guru Nanak Jayanti,2025-11-05,optional,"Birth anniversary of Guru Nanak",true
+Christmas Eve,2025-12-24,optional,"Day before Christmas",true
+Christmas Day,2025-12-25,public,"Christian festival celebrating birth of Jesus",false
+Makar Sankranti,2025-01-14,optional,"Harvest festival",true
+Maha Shivratri,2025-02-26,optional,"Great night of Lord Shiva",true
+Ram Navami,2025-04-06,optional,"Birth of Lord Rama",true
+Eid ul-Adha,2025-06-07,public,"Festival of Sacrifice",false

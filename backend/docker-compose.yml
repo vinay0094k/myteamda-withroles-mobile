@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: employee_dashboard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_NAME: employee_dashboard
+      DB_SSLMODE: disable
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      GIN_MODE: release
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/root/uploads
+
+volumes:
+  postgres_data:

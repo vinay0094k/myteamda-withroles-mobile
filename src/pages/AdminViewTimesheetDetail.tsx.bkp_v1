@@ -1,0 +1,498 @@
+// src/pages/AdminViewTimesheetDetail.tsx
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Calendar, Plus, Edit, Trash2, ChevronLeft, ChevronRight, Check, Download, Eye } from 'lucide-react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom'; // Add useParams
+import { useApi, useApiMutation } from '@/hooks/useApi';
+import { apiClient, UserListItem } from '@/lib/api'; // Import UserListItem
+import { LoadingState } from '@/components/ui/loading-spinner';
+import { ErrorMessage } from '@/components/ui/error-message';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, isAfter, parseISO, isFuture,
+  isToday, isBefore, subDays, addDays, subMonths, getDay } from 'date-fns';
+import MobileHeader from '@/components/MobileHeader';
+import BottomNavbar from '@/components/BottomNavbar';
+import { useAuth } from '@/contexts/AuthContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+
+// FIXED: Display time properly for both new and updated entries
+const displayLocalTime = (timeString: string) => {
+  if (!timeString) return '';
+
+  try {
+    // If it's already in "HH:MM", just echo it
+    if (/^\d{2}:\d{2}$/.test(timeString)) {
+      return timeString;
+    }
+
+    // Otherwise parse the ISO offset into a Date…
+    const date = parseISO(timeString);
+    if (isNaN(date.getTime())) return timeString;
+
+    // …and format it in local time, e.g. "2:00 PM"
+    return format(date, 'p');
+  } catch (error) {
+    console.error('Error formatting time:', timeString, error);
+    return timeString;
+  }
+}
+
+// Helper function to parse entry date correctly
+const parseEntryDate = (dateString: string): Date => {
+  try {
+    // Handle ISO date strings with timezone information
+    if (dateString.includes('T') && (dateString.includes('+') || dateString.includes('Z'))) {
+      const date = parseISO(dateString);
+      // Return just the date part to avoid timezone issues
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    } else {
+      // Handle simple date strings (YYYY-MM-DD)
+      const [year, month, day] = dateString.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+  } catch (error) {
+    console.error('Error parsing date:', dateString, error);
+    return new Date(); // fallback to current date
+  }
+};
+
+// NEW: Helper function to check if a date is weekend
+const isWeekend = (date: Date): boolean => {
+  const day = getDay(date); // 0 = Sunday, 6 = Saturday
+  return day === 0 || day === 6;
+};
+
+const AdminViewTimesheetDetail = () => { // Renamed component
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
+  const { userId } = useParams<{ userId: string }>(); // Get userId from URL params
+
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+
+  const targetUserId = userId; // Use userId from params directly
+
+  const [selectedDayForView, setSelectedDayForView] = useState<Date | null>(() => new Date());
+
+  // State for the employee being viewed
+  const [viewedEmployee, setViewedEmployee] = useState<UserListItem | null>(null);
+
+  // Fetch all users to find the viewed employee if not passed via state
+  const { data: allUsers, loading: loadingAllUsers, error: allUsersError } = useApi(
+    () => (targetUserId && !location.state?.viewedEmployee) ? apiClient.getUsers() : Promise.resolve(null),
+    [targetUserId, location.state?.viewedEmployee]
+  );
+
+  useEffect(() => {
+    if (targetUserId) {
+      if (location.state?.viewedEmployee) {
+        setViewedEmployee(location.state.viewedEmployee);
+      } else if (allUsers) {
+        const foundUser = allUsers.find(u => u.id === targetUserId);
+        if (foundUser) {
+          setViewedEmployee(foundUser);
+        }
+      }
+    } else {
+      setViewedEmployee(null);
+    }
+  }, [targetUserId, location.state?.viewedEmployee, allUsers]);
+
+
+  // Calculate week dates
+  const weekStart = currentWeekStart;
+  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).slice(0, 5); // Mon-Fri only
+
+  // For current week summary, use the original week range
+  const startDate = format(weekStart, 'yyyy-MM-dd');
+  const lastWorkday = subDays(weekEnd, 2);
+  const endDate = format(lastWorkday, 'yyyy-MM-dd');
+  const weekLabel = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd, yyyy')}`; // Changed to match image
+
+  // For fetching ALL entries, use a broader date range (e.g., last 3 months)
+  const broadStartDate = format(subMonths(new Date(), 3), 'yyyy-MM-dd');
+  const broadEndDate = format(addDays(new Date(), 7), 'yyyy-MM-dd'); // Include next week
+
+  // Get broader range of timesheet data to include entries from any day user might click
+  const { data: timesheetData, loading, error, refetch } = useApi(
+    () => apiClient.getTimesheets({
+      start_date: broadStartDate,
+      end_date: broadEndDate,
+      limit: 200,
+      user_id: targetUserId
+    }),
+    [broadStartDate, broadEndDate, targetUserId]
+  );
+
+  // Get current week's summary data (keep this for week progress bar)
+  const { data: summaryData, loading: summaryLoading, refetch: refetchSummary } = useApi(
+    () => apiClient.getTimesheetSummary(startDate, endDate, targetUserId),
+    [startDate, endDate, targetUserId]
+  );
+
+  const { mutate } = useApiMutation();
+
+  const timeEntries = timesheetData?.timesheets || [];
+
+  // Submitted totalHours for current week (for progress bar)
+  const totalHours = summaryData?.summary?.total_hours || 0;
+
+  // Check if there are any draft entries to submit in current week
+  const hasDraftEntries = timeEntries.some(entry => {
+    const entryDate = parseEntryDate(entry.entry_date);
+    const isInCurrentWeek = entryDate >= weekStart && entryDate <= lastWorkday;
+    return entry.status === 'draft' && isInCurrentWeek;
+  });
+
+  // Helper to compute hours for a given date
+  const getDayHours = (date: Date) =>
+    timeEntries
+      .filter(e => {
+        const entryDate = parseEntryDate(e.entry_date);
+        return isSameDay(entryDate, date);
+      })
+      .reduce((sum, e) => sum + (e.duration_hours || 0), 0);
+
+  // Checks if **any** entry that day is submitted
+  const isDayPartiallySubmitted = (date: Date) =>
+    timeEntries.some(e => {
+      const entryDate = parseEntryDate(e.entry_date);
+      return isSameDay(entryDate, date) && e.status === 'submitted';
+    });
+
+  // Its True only if **all** entries that day are submitted (and at least one exists)
+  const isDayFullySubmitted = (date: Date) => {
+    const entriesForDay = timeEntries.filter(e => {
+      const entryDate = parseEntryDate(e.entry_date);
+      return isSameDay(entryDate, date);
+    });
+    return entriesForDay.length > 0 && entriesForDay.every(e => e.status === 'submitted');
+  };
+
+  // Its True if there is **any** draft entry that day
+  const hasDraftEntriesForDay = (date: Date) =>
+    timeEntries.some(e => {
+      const entryDate = parseEntryDate(e.entry_date);
+      return isSameDay(entryDate, date) && e.status === 'draft';
+    });
+
+  // STEP 3: Prevent navigating earlier than 3 weeks ago
+  const earliestWeekStart = subWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), 3);
+
+  const navigateWeek = (dir: 'prev' | 'next') => {
+    setCurrentWeekStart(dir === 'prev'
+      ? subWeeks(currentWeekStart, 1)
+      : addWeeks(currentWeekStart, 1)
+    );
+  };
+
+  const goToCurrentWeek = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const isCurrentWeek = isSameDay(currentWeekStart, startOfWeek(new Date(), { weekStartsOn: 1 }));
+
+  // Get filtered entries for the selected day
+  const getFilteredEntries = () => {
+    if (selectedDayForView) {
+      const selectedDayString = format(selectedDayForView, 'yyyy-MM-dd');
+
+      return timeEntries.filter(e => {
+        const entryDate = parseEntryDate(e.entry_date);
+        const entryDateString = format(entryDate, 'yyyy-MM-dd');
+
+        return entryDateString === selectedDayString;
+      });
+    }
+    return timeEntries;
+  };
+
+  const filteredEntries = getFilteredEntries();
+
+  // Compute date context for Add button logic
+  const dateForAddEntry = selectedDayForView || new Date();
+  const viewedDateHours = getDayHours(dateForAddEntry);
+
+  // Define the state based on the 8-hour limit
+  const isViewedDayLimitReached = viewedDateHours >= 8;
+
+  const isAddEntryButtonDisabled = isFuture(dateForAddEntry) || viewedDateHours >= 8 || isWeekend(dateForAddEntry) || isDayFullySubmitted(dateForAddEntry);
+
+  // Check if current day is weekend for other buttons
+  const isTodayWeekend = isWeekend(new Date());
+
+  const handleSubmitTimesheet = async () => {
+    // This function should ideally not be called in AdminViewTimesheetDetail
+    // as it's a view-only page.
+    toast({
+      title: "Action Not Allowed",
+      description: "You cannot submit timesheets from this view.",
+      variant: "destructive",
+    });
+  };
+
+  const handleEditEntry = (entryId: string) => {
+    toast({
+      title: "Action Not Allowed",
+      description: "You can only edit your own timesheet entries.",
+      variant: "destructive",
+    });
+  };
+
+  const handleDeleteEntry = async (entryId: string) => {
+    toast({
+      title: "Action Not Allowed",
+      description: "You can only delete your own timesheet entries.",
+      variant: "destructive",
+    });
+  };
+
+  // Helper function to get status color (can be reused from AdminTimesheetView)
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'submitted': return 'bg-green-100 text-green-800';
+      case 'draft': return 'bg-orange-100 text-orange-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Helper function to get progress bar color (can be reused from AdminTimesheetView)
+  const getProgressColor = (hours: number) => {
+    if (hours >= 40) return 'bg-green-500';
+    if (hours >= 30) return 'bg-blue-500';
+    if (hours >= 20) return 'bg-purple-500';
+    return 'bg-purple-500';
+  };
+
+  // New function to handle downloading employee timesheet
+  const handleDownloadEmployeeTimesheet = async (employeeId: string) => {
+    try {
+      await apiClient.downloadTimesheetsBulk({
+        user_id: employeeId,
+        start_date: startDate,
+        end_date: endDate,
+      });
+      toast({
+        title: "Download Started",
+        description: "Employee timesheet download initiated.",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download timesheet. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Conditional rendering for the main content based on viewedEmployee
+  if (!viewedEmployee) {
+    return <LoadingState message="Loading employee details..." />;
+  }
+
+  // Calculate status for the week being viewed
+  const totalHoursForWeek = summaryData?.summary?.total_hours || 0;
+  let weekStatus: 'Draft' | 'Submitted' | 'Pending' = 'Draft';
+  if (totalHoursForWeek >= 40) {
+    weekStatus = 'Submitted';
+  } else if (totalHoursForWeek > 0) {
+    weekStatus = 'Pending';
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-20 sm:pb-24">
+      <MobileHeader userName={viewedEmployee.first_name} />
+
+      <div className="px-4 pt-4 pb-24">
+        {/* Header for Admin View */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <button onClick={() => navigate('/admin/timesheets')} className="mr-4">
+              <ArrowLeft className="w-6 h-6 text-gray-600" />
+            </button>
+            <h1 className="text-xl font-semibold text-gray-800">Employee Timesheet</h1>
+          </div>
+          <Calendar className="w-6 h-6 text-gray-600" />
+        </div>
+
+        {/* Admin View Employee Info Card */}
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <Avatar className="w-12 h-12">
+                <AvatarImage src={viewedEmployee.profile_image_url || ''} />
+                <AvatarFallback className="bg-purple-100 text-purple-600">
+                  {viewedEmployee.first_name.charAt(0)}{viewedEmployee.last_name.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="font-semibold text-lg">{viewedEmployee.first_name} {viewedEmployee.last_name}</h3>
+                <p className="text-sm text-gray-500">{viewedEmployee.department || 'No Department'}</p>
+              </div>
+            </div>
+            <Badge className={getStatusColor(weekStatus)}>
+              {weekStatus}
+            </Badge>
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+            <span>{weekLabel}</span>
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" size="sm" className="text-purple-600">
+                <Eye className="w-4 h-4 mr-1" /> View
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-purple-600"
+                onClick={() => handleDownloadEmployeeTimesheet(viewedEmployee.id)}
+              >
+                <Download className="w-4 h-4 mr-1" /> Download
+              </Button>
+            </div>
+          </div>
+
+          {/* Total Hours Progress Bar */}
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Total Hours</span>
+              <span className="text-sm font-medium text-gray-800">
+                {totalHoursForWeek}h / 40h
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all duration-300`}
+                style={{ width: `${Math.min((totalHoursForWeek / 40) * 100, 100)}%`, backgroundColor: getProgressColor(totalHoursForWeek) }}
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Showing the Today and Selected Day Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            {selectedDayForView && isSameDay(selectedDayForView, new Date())
+              ? `Today, ${format(selectedDayForView, 'MMM dd')}`
+              : selectedDayForView
+              ? `${format(selectedDayForView, 'EEEE, MMM dd')}`
+              : `Selected Week Entries`}
+          </h2>
+
+          {loading ? (
+            <LoadingState message="Loading time entries..." />
+          ) : (
+            <div className="space-y-3">
+              {filteredEntries.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  {selectedDayForView && isWeekend(selectedDayForView) ? (
+                    <p>Time entries cannot be added on weekends.</p>
+                  ) : (
+                    <p>
+                      No time entries found for{" "}
+                      {selectedDayForView
+                        ? format(selectedDayForView, "EEEE")
+                        : "today"}
+                      .
+                    </p>
+                  )}
+                </div>
+              ) : (
+                filteredEntries.map((entry) => (
+                  <div key={entry.id} className="bg-white rounded-lg p-4 shadow-sm border">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h3 className="font-medium text-gray-800">{entry.project?.name || 'Project'}</h3>
+                        <p className="text-sm text-gray-600">{entry.task_description}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {format(parseEntryDate(entry.entry_date), 'EEE, MMM dd')}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium text-gray-800">
+                          {entry.duration_hours ? `${entry.duration_hours}h` : 'N/A'}
+                        </span>
+                        {entry.status === 'draft' && (
+                          <div className="flex space-x-1">
+                            <button
+                              onClick={() => handleEditEntry(entry.id)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEntry(entry.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-500">
+                      <span className="mr-2">🕘</span>
+                      <span>
+                        {entry.start_time && entry.end_time
+                          ? `${displayLocalTime(entry.start_time)} - ${displayLocalTime(entry.end_time)}`
+                          : 'Time not specified'}
+                      </span>
+                      <span className={`ml-auto px-2 py-1 rounded-full text-xs font-medium ${
+                        entry.status === 'draft'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : entry.status === 'submitted'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Add Time Entry Button */}
+        <Button
+          onClick={() => {
+            // Always disabled in AdminViewTimesheetDetail
+          }}
+          disabled={true}
+          className={`w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg mb-4 opacity-50 cursor-not-allowed`}
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          View Only
+        </Button>
+
+
+        {/* Conditional completion message for the viewed day */}
+        {isViewedDayLimitReached && (
+          <div className="text-center text-sm text-gray-500 mb-4">
+            8hrs completed for this day!
+          </div>
+        )}
+
+        {/* Bottom Actions */}
+        <Button
+          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 opacity-50 cursor-not-allowed"
+          onClick={() => {
+            // Always disabled in AdminViewTimesheetDetail
+          }}
+          disabled={true}
+        >
+          View Only
+        </Button>
+      </div>
+
+      <BottomNavbar />
+    </div>
+  );
+};
+
+export default AdminViewTimesheetDetail;
